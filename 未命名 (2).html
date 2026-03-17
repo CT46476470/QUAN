@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码补丁工具</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .code-box {
+        @apply h-[420px] overflow-auto bg-gray-900 text-white p-4 rounded-lg whitespace-pre font-mono text-sm;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-6">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-2xl md:text-3xl font-bold text-center mb-4">代码补丁应用工具</h1>
+    <p class="text-center text-gray-600 mb-6">左侧贴原始代码，上方贴diff，右侧自动生成修改后的代码</p>
+
+    <!-- Diff 输入 -->
+    <div class="mb-4">
+      <label class="font-medium mb-1 block">粘贴 Diff 补丁</label>
+      <textarea id="diffInput" class="w-full h-32 p-3 border rounded-lg font-mono text-sm" placeholder="粘贴diff内容..."></textarea>
+    </div>
+
+    <!-- 功能按钮 -->
+    <div class="flex gap-3 mb-4">
+      <button id="copyBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors">
+        复制修改后代码
+      </button>
+      <button id="resetBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded transition-colors">
+        一键重置（清空diff + 覆盖回原始代码）
+      </button>
+    </div>
+
+    <!-- 代码对比区域 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <h3 class="font-medium mb-1">原始代码</h3>
+        <textarea id="sourceInput" class="code-box w-full border-none"></textarea>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">修改后代码（自动生成）</h3>
+        <div id="resultCode" class="code-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const diffInput = document.getElementById('diffInput');
+    const sourceInput = document.getElementById('sourceInput');
+    const resultCode = document.getElementById('resultCode');
+    const copyBtn = document.getElementById('copyBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // 核心：应用diff补丁到原始代码
+    function applyPatch(source, diff) {
+      const sourceLines = source.split('\n');
+      const diffLines = diff.split('\n');
+      const result = [...sourceLines];
+      let offset = 0;
+
+      for (let i = 0; i < diffLines.length; i++) {
+        const line = diffLines[i];
+        if (!line.startsWith('@@') && !line.startsWith('-') && !line.startsWith('+')) continue;
+        if (line.startsWith('@@')) {
+          const match = line.match(/@@ -(\d+),/);
+          if (match) offset = parseInt(match[1]) - 1;
+          continue;
+        }
+
+        if (line.startsWith('-')) {
+          if (offset < result.length) result.splice(offset, 1);
+        } else if (line.startsWith('+')) {
+          result.splice(offset, 0, line.slice(1));
+          offset++;
+        } else {
+          offset++;
+        }
+      }
+      return result.join('\n');
+    }
+
+    // 更新结果
+    function update() {
+      const source = sourceInput.value || '';
+      const diff = diffInput.value || '';
+      resultCode.textContent = applyPatch(source, diff);
+    }
+
+    // 复制修改后代码
+    copyBtn.addEventListener('click', () => {
+      const code = resultCode.textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const oldText = copyBtn.textContent;
+        copyBtn.textContent = '✅ 复制成功！';
+        setTimeout(() => {
+          copyBtn.textContent = oldText;
+        }, 1500);
+      });
+    });
+
+    // 一键重置：清空diff + 将右侧代码覆盖回原始代码
+    resetBtn.addEventListener('click', () => {
+      diffInput.value = '';
+      resultCode.textContent = sourceInput.value;
+      const oldText = resetBtn.textContent;
+      resetBtn.textContent = '✅ 已重置';
+      setTimeout(() => {
+        resetBtn.textContent = oldText;
+      }, 1500);
+    });
+
+    // 实时监听
+    diffInput.addEventListener('input', update);
+    sourceInput.addEventListener('input', update);
+    update();
+  </script>
+</body>
+</html>
